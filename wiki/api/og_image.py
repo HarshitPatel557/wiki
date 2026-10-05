@@ -22,7 +22,11 @@ import re
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils.preview import get_preview_from_html
+try:
+	from frappe.utils.preview import get_preview_from_html
+except ImportError:
+	def get_preview_from_html(*args, **kwargs):
+		raise NotImplementedError("frappe.utils.preview is not available in this Frappe version")
 from werkzeug.wrappers import Response
 
 # Bumped whenever the card template or its token block changes; it is part of

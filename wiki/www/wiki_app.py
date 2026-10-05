@@ -13,10 +13,12 @@ ROBOTS_DIRECTIVE = "noindex, nofollow"
 
 
 def get_context():
-	frappe.local.response_headers.set("X-Robots-Tag", ROBOTS_DIRECTIVE)
+	if getattr(frappe.local, "response_headers", None):
+		frappe.local.response_headers.set("X-Robots-Tag", ROBOTS_DIRECTIVE)
 	csrf_token = frappe.sessions.get_csrf_token()
 	frappe.db.commit()  # nosemgrep
 	context = frappe._dict()
+	context.metatags = {"robots": ROBOTS_DIRECTIVE}
 	context.boot = get_boot()
 	context.boot.csrf_token = csrf_token
 	return context
