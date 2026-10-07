@@ -72,7 +72,7 @@
 			</div>
 		</div>
 
-		<WikiSettings v-model="showWikiSettings" :initial-tab="initialTab" />
+		<WikiSettings v-if="userStore.isWikiManager" v-model="showWikiSettings" :initial-tab="initialTab" />
 	</div>
 </template>
 

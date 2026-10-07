@@ -1,17 +1,18 @@
 app_name = "wiki"
-app_title = "Wiki"
-app_publisher = "Frappe"
-app_description = "Simple Wiki App"
+app_title = "Promot Wiki"
+app_publisher = "Promot"
+app_description = "Promot Wiki Documentation System"
 app_icon = "octicon octicon-file-directory"
 app_color = "grey"
 app_email = "developers@frappe.io"
 app_license = "MIT"
+app_logo_url = "/assets/wiki/images/promot-wiki-icon.png"
 
 add_to_apps_screen = [
 	{
 		"name": "wiki",
-		"logo": "/assets/wiki/images/wiki-logo.png",
-		"title": "Wiki",
+		"logo": "/assets/wiki/images/promot-wiki-icon.png",
+		"title": "Promot Wiki",
 		"route": "/wiki-app",
 		"has_permission": "wiki.utils.check_app_permission",
 	}

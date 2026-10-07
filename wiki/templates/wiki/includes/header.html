@@ -27,7 +27,7 @@
             {% if wiki_space.app_switcher_logo %}
             <img class="h-6 max-w-16 flex-shrink-0" src="{{ wiki_space.app_switcher_logo }}"/>
             {% endif %}
-            <span class="ms-2 text-base-medium leading-tight text-[var(--ink-gray-9)] truncate">{{ wiki_space.space_name or _("Wiki") }}</span>
+            <span class="ms-2 text-base-medium leading-tight text-[var(--ink-gray-9)] truncate">{{ wiki_space.space_name or _("Promot Wiki") }}</span>
             <span class="inline-flex" :class="{ 'rotate-180': spaceSwitcherOpen }">{{ render_icon("chevron-down", "ms-2  shrink-0 text-[var(--ink-gray-5)] transition-transform duration-200") }}</span>
         </button>
 
@@ -55,7 +55,7 @@
             {% if wiki_space.app_switcher_logo %}
             <img class="h-6 max-w-16 flex-shrink-0" src="{{ wiki_space.app_switcher_logo }}"/>
             {% endif %}
-            <span class="{% if wiki_space.app_switcher_logo %}ms-2 {% endif %}text-base-medium leading-tight text-[var(--ink-gray-9)] truncate">{{ wiki_space.space_name or _("Wiki") }}</span>
+            <span class="{% if wiki_space.app_switcher_logo %}ms-2 {% endif %}text-base-medium leading-tight text-[var(--ink-gray-9)] truncate">{{ wiki_space.space_name or _("Promot Wiki") }}</span>
         </div>
         {% endif %}
     </div>

@@ -2,9 +2,9 @@
 	<Sidebar v-model:collapsed="isSidebarCollapsed">
 		<div class="flex h-full flex-col p-2">
 			<SidebarHeader
-				:title="__('Frappe Wiki')"
+				:title="__('Promot Wiki')"
 				:subtitle="userStore.data?.full_name"
-				logo="/assets/wiki/images/wiki-logo.png"
+				logo="/assets/wiki/images/promot-wiki-icon.png"
 				:menu-items="headerMenuItems"
 			/>
 			<nav class="mt-2 flex flex-1 flex-col gap-0.5 overflow-y-auto">
