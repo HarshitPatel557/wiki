@@ -13,6 +13,7 @@
 					:options="userOptions"
 					:placeholder="__('Search people...')"
 					multiple
+					@update:query="onQueryChange"
 				/>
 			</div>
 		</template>
@@ -37,11 +38,10 @@ import {
 	Autocomplete,
 	Button,
 	Dialog,
-	createListResource,
 	createResource,
 	toast,
 } from 'frappe-ui';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -55,29 +55,85 @@ const show = computed({
 });
 
 const selected = ref([]);
+const searchResults = ref([]);
+const loading = ref(false);
 
-const users = createListResource({
-	doctype: 'User',
-	fields: ['name', 'full_name'],
-	filters: { enabled: 1, user_type: 'System User' },
-	orderBy: 'full_name asc',
-	pageLength: 500,
-	auto: true,
-});
+async function fetchUsers(query = '') {
+	loading.value = true;
+	try {
+		const q = encodeURIComponent(query || '');
+		const cr = encodeURIComponent(props.changeRequestId || '');
+		const res = await fetch(
+			`/api/method/project_documentation.api.user_search.search_mention_users?query=${q}&change_request=${cr}&limit=30`,
+			{
+				headers: {
+					Accept: 'application/json',
+				},
+			},
+		);
+		const data = await res.json();
+		searchResults.value = data.message || [];
+	} catch (err) {
+		console.error('Failed to search users for reviewer assignment:', err);
+	} finally {
+		loading.value = false;
+	}
+}
 
-const userOptions = computed(() =>
-	(users.data || []).map((u) => ({
-		label: u.full_name ? `${u.full_name} (${u.name})` : u.name,
-		value: u.name,
-	})),
+let debounceTimer = null;
+function onQueryChange(q) {
+	clearTimeout(debounceTimer);
+	debounceTimer = setTimeout(() => {
+		fetchUsers(q);
+	}, 200);
+}
+
+watch(
+	() => [show.value, props.changeRequestId],
+	([isOpen, crId]) => {
+		if (isOpen && crId) {
+			fetchUsers('');
+		} else if (!isOpen) {
+			selected.value = [];
+		}
+	},
+	{ immediate: true },
 );
+
+const userOptions = computed(() => {
+	const map = new Map();
+
+	// Preserve selected items in options so selections aren't dropped when search query changes
+	for (const s of selected.value) {
+		if (s) {
+			const val = typeof s === 'object' ? s.value : s;
+			const lbl = typeof s === 'object' ? s.label : s;
+			map.set(val, { label: lbl, value: val });
+		}
+	}
+
+	for (const u of searchResults.value) {
+		const val = u.value || u.id || u.name;
+		if (!val) continue;
+		const name = u.label || u.full_name || val;
+		const designation = u.designation || u.custom_designation ? ` (${u.designation || u.custom_designation})` : '';
+		const email = u.email && u.email !== name ? ` · ${u.email}` : (val !== name && val.includes('@') ? ` · ${val}` : '');
+		const label = `${name}${designation}${email}`;
+		map.set(val, {
+			label,
+			value: val,
+		});
+	}
+
+	return Array.from(map.values());
+});
 
 const assignResource = createResource({
 	url: 'frappe.desk.form.assign_to.add',
 });
 
 async function handleAssign(close) {
-	const assignTo = selected.value.map((o) => o.value || o);
+	const assignTo = selected.value.map((o) => (o && o.value ? o.value : o));
 	if (!assignTo.length) return;
 	try {
 		await assignResource.submit({
