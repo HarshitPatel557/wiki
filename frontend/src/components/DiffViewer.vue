@@ -43,8 +43,41 @@ const props = defineProps({
 const wrapper = ref(null);
 let diffInstance = null;
 
+function decodeHtmlEntities(str) {
+	return str
+		.replace(/&amp;/g, '&')
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>');
+}
+
+function formatMentionsForDiff(text) {
+	if (!text) return '';
+	return text.replace(
+		/<span\b[^>]*?(?:data-type=["']mention["']|class=["'][^"']*wiki-mention[^"']*["'])[^>]*?(?:>([\s\S]*?)<\/span>|\/>)/gi,
+		(match, innerText) => {
+			const labelMatch = match.match(/data-label=["']([^"']+)["']/i);
+			let label = labelMatch ? decodeHtmlEntities(labelMatch[1]) : '';
+			if (!label && innerText) {
+				label = decodeHtmlEntities(innerText.trim());
+			}
+			if (label) {
+				return `@${label.replace(/^@/, '')}`;
+			}
+			const idMatch = match.match(/data-id=["']([^"']+)["']/i);
+			if (idMatch && idMatch[1]) {
+				const id = decodeHtmlEntities(idMatch[1]);
+				return `@${id.replace(/^@/, '')}`;
+			}
+			return innerText || '';
+		},
+	);
+}
+
 function normalizeContent(content) {
-	const normalized = (content || '')
+	const formatted = formatMentionsForDiff(content || '');
+	const normalized = formatted
 		.replace(/\r\n/g, '\n')
 		.replace(/\r/g, '\n');
 	if (!normalized) {
