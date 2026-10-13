@@ -96,7 +96,9 @@ export const WikiMention = Node.create({
 		const label = (node.attrs.label || node.attrs.id || '').replace(/"/g, '&quot;');
 		const designation = (node.attrs.designation || '').replace(/"/g, '&quot;');
 		const desAttr = designation ? ` data-designation="${designation}"` : '';
-		return `<span data-type="mention" data-id="${id}" data-label="${label}"${desAttr}>@${label}</span>`;
+		const title = [node.attrs.id, node.attrs.designation].filter(Boolean).join(' · ').replace(/"/g, '&quot;');
+		const titleAttr = title ? ` title="${title}"` : '';
+		return `<span data-type="mention" data-id="${id}" data-label="${label}"${desAttr}${titleAttr}>@${label}</span>`;
 	},
 
 	addOptions() {
