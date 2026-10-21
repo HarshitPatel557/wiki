@@ -1085,9 +1085,11 @@ def apply_cr_operations(
 	cr.check_permission("write")
 	_assert_editable(cr)
 
-	from wiki.permissions import assert_space_writable
+	from wiki.permissions import assert_space_writable, can_write_space
 
 	assert_space_writable(cr.wiki_space)
+	if not can_write_space(cr.wiki_space):
+		frappe.throw(_("You do not have write permission for this Wiki Space."), frappe.PermissionError)
 
 	current_version = int(cr.operation_version or 0)
 	if base_version is not None:

@@ -41,7 +41,7 @@ export default defineConfig(async ({ command, mode }) => {
 				buildConfig: {
 					indexHtmlPath: '../wiki/www/wiki-app.html',
 					emptyOutDir: true,
-					sourcemap: true,
+					sourcemap: process.env.SOURCEMAP === 'true',
 				},
 			}),
 			vue(),
@@ -50,8 +50,8 @@ export default defineConfig(async ({ command, mode }) => {
 			chunkSizeWarningLimit: 1500,
 			outDir: '../wiki/public/frontend',
 			emptyOutDir: true,
-			target: 'es2015',
-			sourcemap: true,
+			target: 'es2020',
+			sourcemap: process.env.SOURCEMAP === 'true',
 		},
 		resolve: {
 			alias: {

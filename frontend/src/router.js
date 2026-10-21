@@ -95,9 +95,46 @@ router.beforeEach(async (to, from, next) => {
 		window.location.href = `/login?redirect-to=/wiki-app${encodeURIComponent(
 			to.fullPath,
 		)}`;
-	} else {
-		next();
+		return;
 	}
+
+	if (to.params.spaceId) {
+		try {
+			const spaceId = to.params.spaceId;
+			const pageId = to.params.pageId;
+			const url = `/api/method/wiki.api.get_space_capabilities?space=${encodeURIComponent(
+				spaceId,
+			)}${pageId ? `&page=${encodeURIComponent(pageId)}` : ''}`;
+			const res = await fetch(url, { credentials: 'same-origin' });
+			if (res.ok) {
+				const json = await res.json();
+				const data = json?.message;
+				if (data) {
+					const isEmpty = !data.has_documents || (data.is_read_only && !data.has_published_documents);
+					if (isEmpty && (data.is_read_only || (!pageId && !data.can_write && !data.can_contribute))) {
+						const { toast } = await import('frappe-ui');
+						const msg = typeof __ === 'function' ? __('No document in space') : 'No document in space';
+						toast.warning(msg);
+						if (from.name === 'SpaceList') {
+							next(false);
+						} else {
+							next({ name: 'SpaceList' });
+						}
+						return;
+					}
+
+					if (data.is_read_only && data.reader_url) {
+						window.location.replace(data.reader_url);
+						return;
+					}
+				}
+			}
+		} catch (error) {
+			// On network error or failure, fall through to regular routing
+		}
+	}
+
+	next();
 });
 
 export default router;

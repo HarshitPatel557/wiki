@@ -201,6 +201,11 @@ default_log_clearing_doctypes = {
 #
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
 
+home_page = "wiki-app/spaces"
+website_user_home_page = "wiki-app/spaces"
+
 website_route_rules = [
 	{"from_route": "/wiki-app/<path:app_path>", "to_route": "wiki-app"},
+	{"from_route": "/wiki-app", "to_route": "wiki-app"},
 ]
+

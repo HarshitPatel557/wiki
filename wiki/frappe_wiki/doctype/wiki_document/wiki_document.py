@@ -337,7 +337,7 @@ class WikiDocument(NestedSet):
 		visitors who then hit the login redirect — unchanged) or when the user has
 		write/merge access (managers always see Edit even with contributions off).
 		"""
-		from wiki.permissions import _space_accepts_contributions, can_write_space
+		from wiki.permissions import can_contribute_to_space
 		from wiki.wiki.git_sync import build_github_edit_url
 
 		# Git-synced pages are edited on GitHub (the button links straight there),
@@ -348,11 +348,8 @@ class WikiDocument(NestedSet):
 				build_github_edit_url(wiki_space_doc.repo_full_name, wiki_space_doc.branch, self.source_path)
 			)
 
-		# Mirror the backend's contribution gate exactly (it treats a missing/NULL
-		# flag as enabled) so the button and the CR endpoints never disagree.
-		if _space_accepts_contributions(wiki_space_doc):
-			return True
-		return can_write_space(wiki_space_doc.name, user)
+		user = user or frappe.session.user
+		return can_contribute_to_space(wiki_space_doc.name, user)
 
 	def check_space_access(self, ptype="read", user=None):
 		"""Gate content access by the owning Wiki Space's role configuration.
@@ -691,6 +688,12 @@ class WikiDocumentRenderer(BaseRenderer):
 		first_page = get_landing_page_for_route(self.path)
 		if first_page:
 			frappe.redirect("/" + first_page["route"])
+
+		# A Wiki Space route with no published documents: redirect to /wiki-app/spaces
+		# with empty_space indicator instead of rendering a 404 error page.
+		clean_path = self.path.strip("/")
+		if clean_path and frappe.db.exists("Wiki Space", {"route": clean_path}):
+			frappe.redirect("/wiki-app/spaces?empty_space=1")
 
 		return False
 

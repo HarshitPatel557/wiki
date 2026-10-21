@@ -90,6 +90,16 @@ def can_read_space(space, user=None) -> bool:
 	if _is_manager(user):
 		return True
 
+	name = _resolve_space_name(space)
+	if name:
+		try:
+			from project_documentation.api.project_access import can_read_space as pd_can_read_space
+			pd_allowed = pd_can_read_space(name, user)
+			if pd_allowed is not None:
+				return bool(pd_allowed)
+		except Exception:
+			pass
+
 	levels = _space_role_levels(space)
 	if not levels:
 		# Open space: every logged-in user, but not anonymous Guests.
@@ -104,6 +114,16 @@ def can_write_space(space, user=None) -> bool:
 	user = user or frappe.session.user
 	if _is_manager(user):
 		return True
+
+	name = _resolve_space_name(space)
+	if name:
+		try:
+			from project_documentation.api.project_access import can_write_space as pd_can_write_space
+			pd_allowed = pd_can_write_space(name, user)
+			if pd_allowed is not None:
+				return bool(pd_allowed)
+		except Exception:
+			pass
 
 	levels = _space_role_levels(space)
 	if not levels:
@@ -136,6 +156,15 @@ def can_contribute_to_space(space, user=None) -> bool:
 	user = user or frappe.session.user
 	if not can_read_space(space, user):
 		return False
+	name = _resolve_space_name(space)
+	if name:
+		try:
+			from project_documentation.api.project_access import get_space_access
+			access = get_space_access(name, user)
+			if access.get("is_project_space"):
+				return bool(access.get("can_write") or access.get("can_manage"))
+		except Exception:
+			pass
 	if can_write_space(space, user):
 		return True
 	return _space_accepts_contributions(space)

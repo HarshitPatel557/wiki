@@ -100,7 +100,7 @@
                     :tree-data="visibleTreeData"
                     :space-root-node="treeData?.root_group || ''"
                     :change-type-map="changeTypeMap"
-                    :readonly="isGitSynced"
+                    :readonly="isGitSynced || !canWriteSpace"
                     :selected-page-id="currentPageId"
                     :selected-draft-key="currentDraftKey"
                     :can-manage-tabs="canManageTabs"
@@ -132,7 +132,7 @@
                     :tree-data="visibleTreeData"
                     :space-root-node="treeData?.root_group || ''"
                     :change-type-map="changeTypeMap"
-                    :readonly="isGitSynced"
+                    :readonly="isGitSynced || !canWriteSpace"
                     :selected-page-id="currentPageId"
                     :selected-draft-key="currentDraftKey"
                     :can-manage-tabs="canManageTabs"
@@ -147,7 +147,7 @@
                 <div class="flex-1 overflow-auto">
                     <router-view
                         :space-id="spaceId"
-                        :readonly="isGitSynced"
+                        :readonly="isGitSynced || !canWriteSpace"
                         @refresh="refreshTree"
                     />
                 </div>
@@ -397,20 +397,23 @@ const canWriteSpace = ref(false);
 const capabilitiesResource = createResource({
 	url: 'wiki.api.get_space_capabilities',
 	onSuccess: (data) => {
-		canWriteSpace.value = Boolean(data?.can_write);
+		canWriteSpace.value = Boolean(data?.can_write || data?.can_contribute);
+		if (data?.is_read_only && data?.reader_url) {
+			window.location.replace(data.reader_url);
+		}
 	},
 });
 
 watch(
-	() => props.spaceId,
-	(id) => {
-		if (id) capabilitiesResource.submit({ space: id });
+	() => [props.spaceId, route.params.pageId],
+	([id, pageId]) => {
+		if (id) capabilitiesResource.submit({ space: id, page: pageId });
 	},
 	{ immediate: true },
 );
 
 // Managing tabs needs both the permission and a space that uses tabs at all.
-const canManageTabs = computed(() => canWriteSpace.value && tabsEnabled.value);
+const canManageTabs = computed(() => Boolean(capabilitiesResource.data?.can_write) && tabsEnabled.value);
 
 const readonlyTreeResource = createResource({
 	url: 'wiki.api.wiki_space.get_wiki_tree',
@@ -508,11 +511,24 @@ function onSyncRealtime(data) {
 	}
 }
 
+function onAccessUpdated(data) {
+	if (!data) return;
+	if (data.wiki_space === props.spaceId || data.project === space.doc?.project) {
+		capabilitiesResource.submit({
+			space: props.spaceId,
+			page: route.params.pageId,
+		});
+		userStore.reload();
+	}
+}
+
 onMounted(() => {
 	useSocket()?.on('wiki_git_sync_update', onSyncRealtime);
+	useSocket()?.on('project_access_updated', onAccessUpdated);
 });
 onBeforeUnmount(() => {
 	useSocket()?.off('wiki_git_sync_update', onSyncRealtime);
+	useSocket()?.off('project_access_updated', onAccessUpdated);
 });
 
 function openUpdateRoutesDialog() {

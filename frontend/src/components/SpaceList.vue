@@ -327,9 +327,22 @@ import {
 	ListRows,
 } from 'frappe-ui/list';
 import { computed, reactive, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
+const route = useRoute();
 const router = useRouter();
+
+watch(
+	() => route.query?.empty_space,
+	(val) => {
+		if (val) {
+			toast.warning(__('No document in space'));
+			router.replace({ path: '/spaces' });
+		}
+	},
+	{ immediate: true },
+);
+
 const userStore = useUserStore();
 const { isMobile } = useMobile();
 const isManager = computed(() => userStore.isWikiManager);
@@ -614,7 +627,23 @@ const tracks = columns.map((col) =>
 // Open the space's public-facing reader. The reader lives at the site root
 // (`/<route>`), outside the `/wiki-app` editor SPA, so it can't go through the
 // router — a new tab keeps the editor session intact.
-function viewSpace(row) {
+async function viewSpace(row) {
+	try {
+		const res = await fetch(
+			`/api/method/wiki.api.get_space_capabilities?space=${encodeURIComponent(row.name)}`,
+			{ credentials: 'same-origin' }
+		);
+		if (res.ok) {
+			const json = await res.json();
+			const data = json?.message;
+			if (data && (!data.has_documents || !data.has_published_documents)) {
+				toast.warning(__('No document in space'));
+				return;
+			}
+		}
+	} catch (e) {
+		// Fall through
+	}
 	window.open(`/${row.route}`, '_blank', 'noopener');
 }
 

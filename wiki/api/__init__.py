@@ -6,8 +6,27 @@ from frappe.translate import get_all_translations
 CONVERTIBLE_IMAGE_EXTENSIONS = (".png", ".jpeg", ".jpg")
 
 
+def _get_space_doc_counts(space: str) -> dict:
+	space_route, root_group = frappe.db.get_value("Wiki Space", space, ["route", "root_group"]) or ("", "")
+	total_docs = frappe.db.count("Wiki Document", {"wiki_space": space, "is_group": 0})
+	pub_docs = frappe.db.count("Wiki Document", {"wiki_space": space, "is_group": 0, "is_published": 1})
+	if total_docs == 0 and root_group:
+		total_docs = frappe.db.count("Wiki Document", {"parent_wiki_document": root_group, "is_group": 0})
+		pub_docs = frappe.db.count("Wiki Document", {"parent_wiki_document": root_group, "is_group": 0, "is_published": 1})
+	if total_docs == 0 and space_route:
+		clean_route = space_route.strip("/")
+		total_docs = frappe.db.count("Wiki Document", {"route": ["like", f"{clean_route}/%"], "is_group": 0})
+		pub_docs = frappe.db.count("Wiki Document", {"route": ["like", f"{clean_route}/%"], "is_group": 0, "is_published": 1})
+	return {
+		"has_documents": total_docs > 0,
+		"has_published_documents": pub_docs > 0,
+		"total_documents": total_docs,
+		"published_documents": pub_docs,
+	}
+
+
 @frappe.whitelist()
-def get_space_capabilities(space: str) -> dict:
+def get_space_capabilities(space: str, page: str = None) -> dict:
 	"""Return the current user's read/write capabilities for a Wiki Space.
 
 	Used by the SPA to show/hide the Merge and contribute actions. Enforcement
@@ -16,10 +35,35 @@ def get_space_capabilities(space: str) -> dict:
 	"""
 	from wiki.permissions import can_contribute_to_space, can_read_space, can_write_space
 
+	can_read = can_read_space(space)
+	can_write = can_write_space(space)
+	can_contribute = can_contribute_to_space(space)
+	is_read_only = bool(can_read and not (can_write or can_contribute))
+
+	doc_counts = _get_space_doc_counts(space)
+	has_published = doc_counts["has_published_documents"]
+
+	page = page or frappe.form_dict.get("page")
+	space_route = frappe.db.get_value("Wiki Space", space, "route") or ""
+	reader_url = None
+	if page:
+		doc_route = frappe.db.get_value("Wiki Document", page, "route")
+		if doc_route:
+			reader_url = f"/{doc_route.strip('/')}"
+	elif space_route and has_published:
+		reader_url = f"/{space_route.strip('/')}/"
+
 	return {
-		"can_read": can_read_space(space),
-		"can_write": can_write_space(space),
-		"can_contribute": can_contribute_to_space(space),
+		"can_read": can_read,
+		"can_write": can_write,
+		"can_contribute": can_contribute,
+		"is_read_only": is_read_only,
+		"reader_url": reader_url,
+		"space_route": space_route,
+		"has_documents": doc_counts["has_documents"],
+		"has_published_documents": has_published,
+		"total_documents": doc_counts["total_documents"],
+		"published_documents": doc_counts["published_documents"],
 	}
 
 
