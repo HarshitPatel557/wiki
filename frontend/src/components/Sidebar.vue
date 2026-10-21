@@ -69,6 +69,11 @@ const navItems = [
 		icon: 'lucide-git-branch',
 		to: { name: 'ChangeRequests' },
 	},
+	{
+		label: __('Tagged to Me'),
+		icon: 'lucide-tag',
+		to: { name: 'TaggedToMe' },
+	},
 ];
 
 function logout() {

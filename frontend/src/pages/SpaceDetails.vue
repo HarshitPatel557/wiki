@@ -393,15 +393,18 @@ function syncStatusLabel(status) {
 
 // Tab management is editor-only (mirrors the backend's can_manage_tabs, which
 // is can_write_space). Enforcement stays server-side; this only hides the UI.
-const canWriteSpace = ref(false);
 const capabilitiesResource = createResource({
 	url: 'wiki.api.get_space_capabilities',
 	onSuccess: (data) => {
-		canWriteSpace.value = Boolean(data?.can_write || data?.can_contribute);
 		if (data?.is_read_only && data?.reader_url) {
 			window.location.replace(data.reader_url);
 		}
 	},
+});
+
+const canWriteSpace = computed(() => {
+	const data = capabilitiesResource.data;
+	return Boolean(data?.can_write || data?.can_contribute || data?.message?.can_write || data?.message?.can_contribute);
 });
 
 watch(
@@ -413,7 +416,11 @@ watch(
 );
 
 // Managing tabs needs both the permission and a space that uses tabs at all.
-const canManageTabs = computed(() => Boolean(capabilitiesResource.data?.can_write) && tabsEnabled.value);
+const canManageTabs = computed(() => {
+	const data = capabilitiesResource.data;
+	const canWrite = Boolean(data?.can_write || data?.message?.can_write);
+	return canWrite && tabsEnabled.value;
+});
 
 const readonlyTreeResource = createResource({
 	url: 'wiki.api.wiki_space.get_wiki_tree',

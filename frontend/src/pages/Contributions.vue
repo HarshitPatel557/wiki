@@ -63,12 +63,25 @@ import {
 	usePageMeta,
 } from 'frappe-ui';
 import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const { isMobile } = useMobile();
 
 usePageMeta(() => ({ title: `${__('Change Requests')} | Promot Wiki` }));
 
 const tabQuery = useRouteQuery('tab', 'my');
+
+watch(
+	tabQuery,
+	(val) => {
+		if (val === 'tagged') {
+			router.replace({ name: 'TaggedToMe' });
+		}
+	},
+	{ immediate: true },
+);
+
 const userStore = useUserStore();
 const isManager = computed(() => userStore.isWikiManager);
 const currentUser = computed(() => userStore.data?.name);
@@ -169,32 +182,6 @@ const tabDefs = computed(() => {
 					title: __('Nothing assigned to you'),
 					description: __(
 						'Change requests assigned to you for review will appear here.',
-					),
-				},
-				reviewRowRoute,
-			),
-		},
-		{
-			key: 'tagged',
-			label: __('Tagged to me'),
-			fields: [
-				'name',
-				'title',
-				'wiki_space.space_name',
-				'status',
-				'owner',
-				'modified',
-				'_assign',
-			],
-			filters: () => ({
-				_user_tags: ['like', `%${currentUser.value}%`],
-			}),
-			columns: reviewColumns,
-			options: listOptions(
-				{
-					title: __('Nothing tagged to you'),
-					description: __(
-						'Change requests mentioning you will appear here.',
 					),
 				},
 				reviewRowRoute,
@@ -313,7 +300,6 @@ function openAssign(row) {
 function onAssigned() {
 	// Refresh only the inboxes that have actually been opened (and thus exist).
 	resources['assigned']?.reload();
-	resources['tagged']?.reload();
 	resources['all']?.reload();
 }
 </script>

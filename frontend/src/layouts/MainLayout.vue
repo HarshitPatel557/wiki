@@ -21,11 +21,22 @@
 						<MobileNavItem
 							:label="__('Change Requests')"
 							:to="{ name: 'ChangeRequests' }"
-							:active="route.name === 'ChangeRequests'"
+							:active="route.name === 'ChangeRequests' || route.name === 'ChangeRequestReview'"
 						>
 							<template #default="{ active }">
 								<span
 									class="lucide-git-branch size-6"
+									:class="active ? 'text-ink-gray-8' : 'text-ink-gray-5'" aria-hidden="true" />
+							</template>
+						</MobileNavItem>
+						<MobileNavItem
+							:label="__('Tagged to Me')"
+							:to="{ name: 'TaggedToMe' }"
+							:active="route.name === 'TaggedToMe'"
+						>
+							<template #default="{ active }">
+								<span
+									class="lucide-tag size-6"
 									:class="active ? 'text-ink-gray-8' : 'text-ink-gray-5'" aria-hidden="true" />
 							</template>
 						</MobileNavItem>

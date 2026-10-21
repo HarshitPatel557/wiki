@@ -37,7 +37,7 @@
 					{{ __('Create First Page') }}
 				</Button>
 			</template>
-			<p v-else class="text-sm text-ink-gray-5">{{ __('No pages have synced from the repository yet') }}</p>
+			<p v-else class="text-sm text-ink-gray-5">{{ __('No pages have been created or synced yet') }}</p>
 		</div>
 
 		<div v-else>

@@ -17,6 +17,15 @@ const routes = [
 		component: () => import('@/pages/Contributions.vue'),
 	},
 	{
+		path: '/tagged',
+		name: 'TaggedToMe',
+		component: () => import('@/pages/TaggedContributions.vue'),
+	},
+	{
+		path: '/tagged-to-me',
+		redirect: { name: 'TaggedToMe' },
+	},
+	{
 		path: '/change-requests/:changeRequestId',
 		name: 'ChangeRequestReview',
 		component: () => import('@/pages/ContributionReview.vue'),
