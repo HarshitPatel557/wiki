@@ -52,7 +52,6 @@ const reviewColumns = [
 	{ label: __('Author'), key: 'owner', width: 1 },
 	{ label: __('Space'), key: 'space_name', width: 2 },
 	{ label: __('Status'), key: 'status', width: '8rem' },
-	{ label: __('Assignees'), key: 'assign', width: '6rem', align: 'right' },
 	{ label: '', key: 'modified', width: '7.5rem', align: 'right' },
 ];
 
