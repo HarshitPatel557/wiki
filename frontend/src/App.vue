@@ -10,15 +10,37 @@ setConfig('localTimezone', window.timezone?.user || null);
 // Realtime reviewer-decision pings to the change-request author. The matching
 // Notification Log entry (created server-side) is the durable copy; this is
 // just the live nudge while the author has the app open.
+import { useNotificationsStore } from './stores/notifications';
+
+const notificationsStore = useNotificationsStore();
+
 function onChangeRequestUpdate(data: { subject?: string }) {
 	if (data?.subject) toast.info(data.subject);
+	notificationsStore.reload();
+}
+
+function onWikiMention(data: { subject?: string }) {
+	notificationsStore.reload();
+	if (data?.subject) {
+		toast.info(data.subject);
+	}
+}
+
+function onNotification() {
+	notificationsStore.reload();
 }
 
 onMounted(() => {
-	useSocket()?.on('wiki_change_request_update', onChangeRequestUpdate);
+	const socket = useSocket();
+	socket?.on('wiki_change_request_update', onChangeRequestUpdate);
+	socket?.on('wiki_mention', onWikiMention);
+	socket?.on('notification', onNotification);
 });
 onBeforeUnmount(() => {
-	useSocket()?.off('wiki_change_request_update', onChangeRequestUpdate);
+	const socket = useSocket();
+	socket?.off('wiki_change_request_update', onChangeRequestUpdate);
+	socket?.off('wiki_mention', onWikiMention);
+	socket?.off('notification', onNotification);
 });
 </script>
 

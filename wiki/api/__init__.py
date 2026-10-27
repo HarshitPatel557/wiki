@@ -161,3 +161,115 @@ def upload_wiki_asset():
 	):
 		convert_file_to_webp(file_doc)
 	return file_doc
+
+
+@frappe.whitelist()
+def get_wiki_notifications(limit=30) -> dict:
+	"""Fetch recent notifications and unread/tagged counts for the current user in Wiki."""
+	if frappe.session.user == "Guest":
+		return {"unread_count": 0, "tagged_count": 0, "notifications": []}
+
+	user = frappe.session.user
+
+	# 1. Total unread notification logs for user
+	unread_count = frappe.db.count("Notification Log", {"for_user": user, "read": 0})
+
+	# 2. Count of active Wiki Change Requests tagged to user
+	tagged_count = frappe.db.count(
+		"Wiki Change Request",
+		filters=[
+			["_user_tags", "like", f"%{user}%"],
+			["status", "in", ["In Review", "Draft"]],
+		],
+	)
+
+	# 3. Notification logs
+	logs = frappe.db.get_list(
+		"Notification Log",
+		filters={"for_user": user},
+		fields=[
+			"name",
+			"subject",
+			"read",
+			"type",
+			"document_type",
+			"document_name",
+			"link",
+			"from_user",
+			"creation",
+			"modified",
+		],
+		order_by="creation desc",
+		limit=limit,
+	)
+
+	# Resolve user full names and avatars
+	from_users = {log["from_user"] for log in logs if log.get("from_user")}
+	user_details = {}
+	if from_users:
+		users_data = frappe.db.get_all(
+			"User",
+			filters={"name": ["in", list(from_users)]},
+			fields=["name", "full_name", "user_image"],
+		)
+		for u in users_data:
+			user_details[u["name"]] = u
+
+	result = []
+	for log in logs:
+		sender = user_details.get(log.get("from_user")) or {}
+		link = log.get("link") or ""
+		if not link and log.get("document_type") == "Wiki Change Request" and log.get("document_name"):
+			link = f"/wiki-app/change-requests/{log['document_name']}"
+		elif "/app/wiki-change-request/" in link:
+			cr_name = link.split("/")[-1]
+			link = f"/wiki-app/change-requests/{cr_name}"
+
+		result.append({
+			"name": log["name"],
+			"subject": log.get("subject"),
+			"read": bool(log.get("read")),
+			"type": log.get("type"),
+			"document_type": log.get("document_type"),
+			"document_name": log.get("document_name"),
+			"link": link,
+			"from_user": log.get("from_user"),
+			"from_user_name": sender.get("full_name") or log.get("from_user"),
+			"from_user_image": sender.get("user_image"),
+			"creation": str(log.get("creation")),
+			"pretty_date": frappe.utils.pretty_date(log.get("creation")),
+		})
+
+	return {
+		"unread_count": unread_count,
+		"tagged_count": tagged_count,
+		"notifications": result,
+	}
+
+
+@frappe.whitelist()
+def mark_wiki_notification_as_read(docname: str = None) -> dict:
+	"""Mark a single notification or all notifications as read for current user."""
+	if frappe.session.user == "Guest":
+		return {"success": False}
+
+	user = frappe.session.user
+	if docname and docname != "all":
+		frappe.db.set_value(
+			"Notification Log",
+			{"name": docname, "for_user": user},
+			"read",
+			1,
+			update_modified=False,
+		)
+	else:
+		frappe.db.set_value(
+			"Notification Log",
+			{"for_user": user, "read": 0},
+			"read",
+			1,
+			update_modified=False,
+		)
+	frappe.db.commit()
+	return {"success": True}
+
