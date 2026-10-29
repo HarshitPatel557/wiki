@@ -92,10 +92,6 @@ def can_read_space(space, user=None) -> bool:
 
 	name = _resolve_space_name(space)
 	if name:
-		space_data = frappe.db.get_value("Wiki Space", name, ["is_personal", "owner"], as_dict=True)
-		if space_data and space_data.is_personal:
-			return space_data.owner == user
-
 		try:
 			from project_documentation.api.project_access import can_read_space as pd_can_read_space
 			pd_allowed = pd_can_read_space(name, user)
@@ -121,10 +117,6 @@ def can_write_space(space, user=None) -> bool:
 
 	name = _resolve_space_name(space)
 	if name:
-		space_data = frappe.db.get_value("Wiki Space", name, ["is_personal", "owner"], as_dict=True)
-		if space_data and space_data.is_personal:
-			return space_data.owner == user
-
 		try:
 			from project_documentation.api.project_access import can_write_space as pd_can_write_space
 			pd_allowed = pd_can_write_space(name, user)
@@ -213,10 +205,9 @@ def _accessible_space_names(user=None) -> set:
 	if user == "Guest":
 		return accessible_restricted
 
-	all_spaces = set(frappe.get_all("Wiki Space", filters={"is_personal": 0}, pluck="name"))
-	my_personal = set(frappe.get_all("Wiki Space", filters={"is_personal": 1, "owner": user}, pluck="name"))
+	all_spaces = set(frappe.get_all("Wiki Space", pluck="name"))
 	open_spaces = all_spaces - restricted_spaces
-	return open_spaces | accessible_restricted | my_personal
+	return open_spaces | accessible_restricted
 
 
 def _space_in_clause(table: str, user: str, allow_null: bool) -> str:

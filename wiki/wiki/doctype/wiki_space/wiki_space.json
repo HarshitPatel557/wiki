@@ -10,7 +10,6 @@
  "field_order": [
   "general_tab",
   "space_name",
-  "is_personal",
   "route",
   "switcher_order",
   "column_break_bynr",
@@ -105,13 +104,6 @@
    "fieldname": "space_name",
    "fieldtype": "Data",
    "label": "Space Name"
-  },
-  {
-   "default": "0",
-   "fieldname": "is_personal",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Is Personal Space"
   },
   {
    "fieldname": "app_switcher_logo",

@@ -146,9 +146,11 @@ class WikiSpace(Document):
 					"is_group": 1,
 					"published": 0,
 					"content": "[root_group]",
+					"wiki_space": self.name,
+					"owner": self.owner or frappe.session.user,
 				}
 			)
-			root_group.insert()
+			root_group.insert(ignore_permissions=True)
 			self.root_group = root_group.name
 
 	@frappe.whitelist()

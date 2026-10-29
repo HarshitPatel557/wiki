@@ -6,6 +6,12 @@ from frappe.translate import get_all_translations
 CONVERTIBLE_IMAGE_EXTENSIONS = (".png", ".jpeg", ".jpg")
 
 
+def _is_personal_space(space: str) -> bool:
+	if not frappe.db.table_exists("Project Documentation Project"):
+		return False
+	return not bool(frappe.db.get_value("Project Documentation Project", {"wiki_space": space}, "name"))
+
+
 def _get_space_doc_counts(space: str) -> dict:
 	space_route, root_group = frappe.db.get_value("Wiki Space", space, ["route", "root_group"]) or ("", "")
 	total_docs = frappe.db.count("Wiki Document", {"wiki_space": space, "is_group": 0})
@@ -53,7 +59,7 @@ def get_space_capabilities(space: str, page: str = None) -> dict:
 	elif space_route and has_published:
 		reader_url = f"/{space_route.strip('/')}/"
 
-	is_personal = bool(frappe.db.get_value("Wiki Space", space, "is_personal"))
+	is_personal = _is_personal_space(space)
 
 	return {
 		"can_read": can_read,
@@ -102,7 +108,6 @@ def create_personal_space(space_name: str, route: str | None = None) -> dict:
 			"doctype": "Wiki Space",
 			"space_name": space_name,
 			"route": route,
-			"is_personal": 1,
 			"is_published": 1,
 			"owner": user,
 		}
@@ -112,7 +117,6 @@ def create_personal_space(space_name: str, route: str | None = None) -> dict:
 		"name": doc.name,
 		"space_name": doc.space_name,
 		"route": doc.route,
-		"is_personal": 1,
 	}
 
 

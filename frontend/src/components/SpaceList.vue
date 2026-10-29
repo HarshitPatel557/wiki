@@ -171,7 +171,7 @@
                     {{ __('View') }}
                   </Button>
                   <Button
-                    v-if="row.is_personal && (row.owner === currentUser || isManager)"
+                    v-if="isPersonalRow(row) && (row.owner === currentUser || isManager)"
                     variant="ghost"
                     theme="red"
                     size="sm"
@@ -456,7 +456,11 @@ const canCreateSpace = computed(() => {
 });
 
 function openCreateSpaceDialog() {
-	createSpaceCategory.value = activeCategory.value;
+	if (!isManager.value) {
+		createSpaceCategory.value = 'personal';
+	} else {
+		createSpaceCategory.value = activeCategory.value;
+	}
 	showCreateDialog.value = true;
 }
 
@@ -768,7 +772,6 @@ const spaces = createListResource({
 		'route',
 		'root_group',
 		'is_published',
-		'is_personal',
 		'owner',
 	],
 	orderBy: 'creation desc',
@@ -799,14 +802,31 @@ const spaces = createListResource({
 	},
 });
 
+const spaceCategoriesResource = createResource({
+	url: 'project_documentation.api.project_access.get_user_space_categories',
+	auto: true,
+});
+
+const projectSpaceNames = computed(() => {
+	const list =
+		spaceCategoriesResource.data?.project_spaces ||
+		spaceCategoriesResource.data?.message?.project_spaces ||
+		[];
+	return new Set(list);
+});
+
+const isPersonalRow = (row) => {
+	return !projectSpaceNames.value.has(row?.name);
+};
+
 const projectSpaces = computed(() => {
-	return (spaces.data || []).filter((s) => !s.is_personal);
+	return (spaces.data || []).filter((s) => projectSpaceNames.value.has(s.name));
 });
 
 const personalSpaces = computed(() => {
 	return (spaces.data || []).filter(
 		(s) =>
-			Boolean(s.is_personal) &&
+			!projectSpaceNames.value.has(s.name) &&
 			(s.owner === currentUser.value || isManager.value),
 	);
 });
@@ -870,6 +890,7 @@ const handleCreateSpace = async () => {
 			formError.value = '';
 			toast.success(__('Personal Space created successfully.'));
 			await spaces.reload();
+			spaceCategoriesResource.reload();
 			if (res?.name) {
 				router.push({ name: 'SpaceDetails', params: { spaceId: res.name } });
 			}
@@ -890,7 +911,6 @@ const handleCreateSpace = async () => {
 	const payload = {
 		space_name: newSpace.space_name,
 		route: newSpace.route,
-		is_personal: 0,
 		roles: [{ role: 'Guest', permission_level: 'Read' }],
 	};
 
