@@ -57,14 +57,14 @@
             </template>
         </SpaceChromeBar>
         <SpaceChromeBar
-            v-else-if="isPersonalSpace"
+            v-else-if="!enableCrWorkflow"
             :space-name="space.doc?.space_name || spaceId"
             :space-route="space.doc?.route"
             @open-settings="openSettings"
         >
             <template #badge>
                 <Badge variant="subtle" theme="blue" size="sm">
-                    {{ __('Personal Space') }}
+                    {{ isPersonalSpace ? __('Personal Space') : __('Direct Publishing') }}
                 </Badge>
             </template>
         </SpaceChromeBar>
@@ -419,11 +419,24 @@ const canWriteSpace = computed(() => {
 	return Boolean(data?.can_write || data?.can_contribute || data?.message?.can_write || data?.message?.can_contribute);
 });
 
+const enableCrWorkflow = computed(() => {
+	const data = capabilitiesResource.data;
+	if (data?.enable_cr_workflow !== undefined) return Boolean(data.enable_cr_workflow);
+	if (data?.message?.enable_cr_workflow !== undefined) return Boolean(data.message.enable_cr_workflow);
+	return !isPersonalSpace.value;
+});
+
 const isPersonalSpace = computed(() => {
 	const data = capabilitiesResource.data;
 	return Boolean(data?.is_personal || data?.message?.is_personal || space.doc?.is_personal);
 });
-provide('isPersonalSpace', isPersonalSpace);
+
+const isDirectPublishing = computed(() => {
+	return isPersonalSpace.value || !enableCrWorkflow.value;
+});
+
+provide('isPersonalSpace', isDirectPublishing);
+provide('enableCrWorkflow', enableCrWorkflow);
 
 watch(
 	() => [props.spaceId, route.params.pageId],
@@ -547,13 +560,25 @@ function onAccessUpdated(data) {
 	}
 }
 
+function onWorkflowUpdated(data) {
+	if (!data) return;
+	if (data.wiki_space === props.spaceId || data.project === space.doc?.project) {
+		capabilitiesResource.submit({
+			space: props.spaceId,
+			page: route.params.pageId,
+		});
+	}
+}
+
 onMounted(() => {
 	useSocket()?.on('wiki_git_sync_update', onSyncRealtime);
 	useSocket()?.on('project_access_updated', onAccessUpdated);
+	useSocket()?.on('wiki_space_workflow_updated', onWorkflowUpdated);
 });
 onBeforeUnmount(() => {
 	useSocket()?.off('wiki_git_sync_update', onSyncRealtime);
 	useSocket()?.off('project_access_updated', onAccessUpdated);
+	useSocket()?.off('wiki_space_workflow_updated', onWorkflowUpdated);
 });
 
 function openUpdateRoutesDialog() {
