@@ -157,6 +157,7 @@ import {
 	FormControl,
 	Skeleton,
 	createDocumentResource,
+	createResource,
 	getCachedDocumentResource,
 	toast,
 	usePageMeta,
@@ -198,6 +199,28 @@ const showPageSettingsDialog = ref(false);
 const crStore = useChangeRequestStore();
 const draftStore = useDraftWorkspaceStore();
 const userStore = useUserStore();
+const isPersonalSpace = inject('isPersonalSpace', ref(false));
+
+async function autoMergeIfPersonal() {
+	if (!isPersonalSpace.value) return;
+	const crName = crStore.currentChangeRequest?.name;
+	if (!crName) return;
+	try {
+		await createResource({
+			url: 'wiki.api.direct_merge_change_request',
+			params: { name: crName },
+		}).submit();
+		crStore.currentChangeRequest = null;
+		crStore.clearChanges();
+		await draftStore.discardPersistedDraftsForCr(crName);
+		draftStore.reset({ keepTree: true });
+		if (props.spaceId) {
+			await draftStore.hydrate(props.spaceId);
+		}
+	} catch (err) {
+		console.error('Direct merge failed:', err);
+	}
+}
 
 // frappe-ui caches document resources by (doctype, name), so revisiting an
 // already-opened page renders instantly from the cached doc while `auto`
@@ -497,7 +520,11 @@ async function saveTitleIfChanged() {
 	if (!wikiDoc.value.doc?.doc_key) return;
 	try {
 		await draftStore.updateNode(wikiDoc.value.doc.doc_key, { title: newTitle });
+		await autoMergeIfPersonal();
 		await loadCrPage();
+		if (isPersonalSpace.value) {
+			toast.success(__('Title updated'));
+		}
 	} catch (error) {
 		toast.error(error.messages?.[0] || __('Error updating title'));
 	}
@@ -518,8 +545,12 @@ async function saveRoute(close) {
 	isSavingRoute.value = true;
 	try {
 		await draftStore.updateNode(wikiDoc.value.doc.doc_key, { route: newRoute });
+		await autoMergeIfPersonal();
 		await loadCrPage();
 		close();
+		if (isPersonalSpace.value) {
+			toast.success(__('Route updated'));
+		}
 	} catch (error) {
 		toast.error(error.messages?.[0] || __('Error updating route'));
 	} finally {
@@ -534,7 +565,11 @@ async function togglePublish() {
 		await draftStore.updateNode(wikiDoc.value.doc.doc_key, {
 			is_published: newStatus,
 		});
+		await autoMergeIfPersonal();
 		await loadCrPage();
+		if (isPersonalSpace.value) {
+			toast.success(newStatus ? __('Published') : __('Unpublished'));
+		}
 	} catch (error) {
 		toast.error(error.messages?.[0] || __('Error updating publish status'));
 	}
@@ -574,10 +609,14 @@ async function saveContent(content) {
 			content,
 			editableTitle.value,
 		);
+		await autoMergeIfPersonal();
 		// Refresh the CR overlay snapshot so the panel's title/route/etc.
 		// stay in sync with the change we just wrote. Inline failure UX
 		// lands in task #7.
 		await loadCrPage();
+		if (isPersonalSpace.value) {
+			toast.success(__('Page saved successfully'));
+		}
 	} catch (error) {
 		console.error('Error saving change request:', error);
 		toast.error(

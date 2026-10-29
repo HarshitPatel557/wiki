@@ -7,11 +7,11 @@
       <template #right>
         <div class="flex items-center gap-1">
           <Button
-            v-if="isManager"
+            v-if="canCreateSpace"
             variant="ghost"
             icon="lucide-plus"
             :label="__('New Space')"
-            @click="showCreateDialog = true"
+            @click="openCreateSpaceDialog"
           />
           <MobileAppMenu />
         </div>
@@ -31,17 +31,58 @@
           </template>
         </FormControl>
         <Button
-          v-if="isManager"
+          v-if="canCreateSpace"
           variant="solid"
-          @click="showCreateDialog = true"
+          @click="openCreateSpaceDialog"
         >
           <template #prefix>
             <span class="lucide-plus h-4 w-4" aria-hidden="true" />
           </template>
-          {{ __('New Space') }}
+          {{ activeCategory === 'personal' ? __('New Personal Space') : __('New Space') }}
         </Button>
       </div>
     </PageHeader>
+
+    <!-- Two Category Tabs: Project Documents & Personal Documents -->
+    <div class="flex items-center gap-2 border-b border-outline-gray-2 pb-2">
+      <Button
+        :variant="activeCategory === 'project' ? 'solid' : 'ghost'"
+        size="sm"
+        @click="activeCategory = 'project'"
+      >
+        <template #prefix>
+          <span class="lucide-folder-git-2 h-4 w-4" aria-hidden="true" />
+        </template>
+        {{ __('Project Documents') }}
+        <Badge
+          variant="subtle"
+          :theme="activeCategory === 'project' ? 'blue' : 'gray'"
+          size="sm"
+          class="ml-1.5"
+        >
+          {{ projectSpacesCount }}
+        </Badge>
+      </Button>
+      <Button
+        :variant="activeCategory === 'personal' ? 'solid' : 'ghost'"
+        size="sm"
+        @click="activeCategory = 'personal'"
+      >
+        <template #prefix>
+          <span class="lucide-user h-4 w-4" aria-hidden="true" />
+        </template>
+        {{ __('Personal Documents') }}
+        <Badge
+          variant="subtle"
+          :theme="activeCategory === 'personal' ? 'blue' : 'gray'"
+          size="sm"
+          class="ml-1.5"
+        >
+          {{ personalSpacesCount }}
+        </Badge>
+      </Button>
+    </div>
+
     <!-- Mobile keeps an inline search row (the centered header has no room). -->
     <FormControl
       v-if="isMobile"
@@ -72,27 +113,29 @@
 
       <!-- The List family owns geometry only; empty states are app-authored. -->
       <div
-        v-else-if="!(spaces.data || []).length"
+        v-else-if="!currentListItems.length"
         class="flex flex-col items-center justify-center py-16 text-center"
       >
         <p class="text-lg-medium text-ink-gray-7">
-          {{ searchQuery ? __('No spaces found') : __('No Wiki Spaces') }}
+          {{ searchQuery ? __('No spaces found') : (activeCategory === 'personal' ? __('No Personal Documents') : __('No Project Documents')) }}
         </p>
         <p class="mt-1 max-w-sm text-p-sm text-ink-gray-5">
           {{
             searchQuery
               ? __('No wiki spaces matched your search')
-              : isManager
-                ? __('Create your first wiki space to get started')
-                : __('No wiki spaces available')
+              : activeCategory === 'personal'
+                ? __('Create your personal space to start writing personal documentation.')
+                : isManager
+                  ? __('Create your first wiki space to get started')
+                  : __('No project spaces available')
           }}
         </p>
         <Button
-          v-if="isManager && !searchQuery"
+          v-if="canCreateSpace && !searchQuery"
           class="mt-4"
           variant="solid"
-          :label="__('New Space')"
-          @click="showCreateDialog = true"
+          :label="activeCategory === 'personal' ? __('New Personal Space') : __('New Space')"
+          @click="openCreateSpaceDialog"
         />
       </div>
 
@@ -105,7 +148,7 @@
               {{ col.label }}
             </ListHeaderCell>
           </ListHeader>
-          <ListRows :items="spaces.data || []" row-key="name" v-slot="{ item: row }">
+          <ListRows :items="currentListItems" row-key="name" v-slot="{ item: row }">
             <ListRow :to="{ name: 'SpaceDetails', params: { spaceId: row.name } }">
               <ListCell v-for="col in columns" :key="col.key">
                 <Badge
@@ -115,7 +158,7 @@
                   size="sm"
                   :label="row.is_published ? __('Published') : __('Unpublished')"
                 />
-                <div v-else-if="col.key === 'view'" class="flex items-center">
+                <div v-else-if="col.key === 'actions'" class="flex items-center gap-1">
                   <!-- Rows are router-links (an <a>); .stop alone won't stop the browser
                        from following the row href, so .prevent is required too. -->
                   <Button
@@ -127,6 +170,15 @@
                   >
                     {{ __('View') }}
                   </Button>
+                  <Button
+                    v-if="row.is_personal && (row.owner === currentUser || isManager)"
+                    variant="ghost"
+                    theme="red"
+                    size="sm"
+                    icon="trash-2"
+                    :title="__('Delete Personal Space')"
+                    @click.stop.prevent="confirmDeleteSpace(row)"
+                  />
                 </div>
                 <!-- Cells don't inherit an ink color from the List family, so an
                      explicit token is required or the text goes black in dark mode. -->
@@ -155,23 +207,39 @@
 
     <Dialog
       v-model:open="showCreateDialog"
-      :title="__('Create Wiki Space')"
+      :title="createSpaceCategory === 'personal' ? __('Create Personal Space') : __('Create Wiki Space')"
       size="lg"
       :actions="[
         {
           label: __('Create'),
           variant: 'solid',
+          loading: isCreating,
           onClick: handleCreateSpace,
         },
       ]"
     >
       <template #default>
         <div class="flex flex-col gap-4">
+          <div v-if="isManager" class="flex items-center gap-4 p-2.5 bg-surface-gray-2 rounded-lg border border-outline-gray-2">
+            <span class="text-p-sm font-medium text-ink-gray-7">{{ __('Category:') }}</span>
+            <label class="flex items-center gap-1.5 text-p-sm cursor-pointer text-ink-gray-8">
+              <input type="radio" value="personal" v-model="createSpaceCategory" />
+              {{ __('Personal Space') }}
+            </label>
+            <label class="flex items-center gap-1.5 text-p-sm cursor-pointer text-ink-gray-8">
+              <input type="radio" value="project" v-model="createSpaceCategory" />
+              {{ __('Project Space') }}
+            </label>
+          </div>
+          <p v-if="createSpaceCategory === 'personal'" class="text-p-xs text-ink-gray-5">
+            {{ __('Personal spaces allow direct editing and saving without raising change requests or PRs.') }}
+          </p>
+
           <FormControl
             type="text"
             :label="__('Space Name')"
             v-model="newSpace.space_name"
-            :placeholder="__('My Wiki Space')"
+            :placeholder="createSpaceCategory === 'personal' ? __('My Personal Notes') : __('My Wiki Space')"
           />
           <FormControl
             type="text"
@@ -183,11 +251,12 @@
             :description="__('The URL path for this wiki space (e.g., /my-wiki-space)')"
           />
 
-          <FormControl
-            type="checkbox"
-            :label="__('Synced from GitHub?')"
-            v-model="newSpace.git_synced"
-          />
+          <template v-if="createSpaceCategory === 'project'">
+            <FormControl
+              type="checkbox"
+              :label="__('Synced from GitHub?')"
+              v-model="newSpace.git_synced"
+            />
 
           <template v-if="newSpace.git_synced">
             <!-- Checking the connection + loading the account list right after the
@@ -292,9 +361,35 @@
               </template>
             </template>
           </template>
+          </template>
 
           <ErrorMessage :message="formError || spaces.insert.error" />
         </div>
+      </template>
+    </Dialog>
+
+    <Dialog
+      v-model:open="showDeleteConfirm"
+      :title="__('Delete Personal Space')"
+      :actions="[
+        {
+          label: __('Cancel'),
+          variant: 'subtle',
+          onClick: () => (showDeleteConfirm = false),
+        },
+        {
+          label: __('Delete'),
+          theme: 'red',
+          variant: 'solid',
+          loading: isDeleting,
+          onClick: handleDeleteSpace,
+        },
+      ]"
+    >
+      <template #default>
+        <p class="text-p-sm text-ink-gray-7">
+          {{ __('Are you sure you want to delete personal space "{0}"? All its documents will be permanently removed.', [spaceToDelete?.space_name || spaceToDelete?.name]) }}
+        </p>
       </template>
     </Dialog>
   </div>
@@ -346,6 +441,24 @@ watch(
 const userStore = useUserStore();
 const { isMobile } = useMobile();
 const isManager = computed(() => userStore.isWikiManager);
+
+const activeCategory = ref('project'); // 'project' | 'personal'
+const createSpaceCategory = ref('personal');
+const isCreating = ref(false);
+const showDeleteConfirm = ref(false);
+const spaceToDelete = ref(null);
+const isDeleting = ref(false);
+
+const currentUser = computed(() => userStore.data?.name || '');
+const canCreateSpace = computed(() => {
+	if (activeCategory.value === 'personal') return Boolean(userStore.data?.is_logged_in);
+	return isManager.value;
+});
+
+function openCreateSpaceDialog() {
+	createSpaceCategory.value = activeCategory.value;
+	showCreateDialog.value = true;
+}
 
 const showCreateDialog = ref(false);
 const routeManuallyEdited = ref(false);
@@ -610,10 +723,10 @@ const columns = [
 		width: 2,
 	},
 	{
-		// Wide last column, left-aligned: keeps the View buttons in one straight
+		// Wide last column, left-aligned: keeps the View and Delete buttons in one straight
 		// column that starts right after the route rather than hugging the far edge.
 		label: '',
-		key: 'view',
+		key: 'actions',
 		width: 3,
 		align: 'left',
 	},
@@ -649,9 +762,17 @@ async function viewSpace(row) {
 
 const spaces = createListResource({
 	doctype: 'Wiki Space',
-	fields: ['name', 'space_name', 'route', 'root_group', 'is_published'],
+	fields: [
+		'name',
+		'space_name',
+		'route',
+		'root_group',
+		'is_published',
+		'is_personal',
+		'owner',
+	],
 	orderBy: 'creation desc',
-	pageLength: 25,
+	pageLength: 50,
 	auto: true,
 	insert: {
 		onSuccess: (doc) => {
@@ -678,6 +799,35 @@ const spaces = createListResource({
 	},
 });
 
+const projectSpaces = computed(() => {
+	return (spaces.data || []).filter((s) => !s.is_personal);
+});
+
+const personalSpaces = computed(() => {
+	return (spaces.data || []).filter(
+		(s) =>
+			Boolean(s.is_personal) &&
+			(s.owner === currentUser.value || isManager.value),
+	);
+});
+
+const projectSpacesCount = computed(() => projectSpaces.value.length);
+const personalSpacesCount = computed(() => personalSpaces.value.length);
+
+const currentListItems = computed(() => {
+	const list =
+		activeCategory.value === 'personal'
+			? personalSpaces.value
+			: projectSpaces.value;
+	if (!searchQuery.value) return list;
+	const q = searchQuery.value.toLowerCase().trim();
+	return list.filter(
+		(s) =>
+			(s.space_name || '').toLowerCase().includes(q) ||
+			(s.route || '').toLowerCase().includes(q),
+	);
+});
+
 let searchDebounceTimer = null;
 watch(searchQuery, (value) => {
 	clearTimeout(searchDebounceTimer);
@@ -696,15 +846,42 @@ watch(searchQuery, (value) => {
 	}, 300);
 });
 
-const handleCreateSpace = () => {
-	// Surface validation through the dialog's ErrorMessage rather than a rejected
-	// promise (which only ends up in the console). The dialog stays open either
-	// way — it closes only on insert success.
+const handleCreateSpace = async () => {
 	formError.value = '';
 	if (!newSpace.route) {
 		formError.value = __('Route is required.');
 		return;
 	}
+
+	if (createSpaceCategory.value === 'personal') {
+		isCreating.value = true;
+		try {
+			const res = await createResource({
+				url: 'wiki.api.create_personal_space',
+				params: {
+					space_name: newSpace.space_name || newSpace.route,
+					route: newSpace.route,
+				},
+			}).submit();
+			showCreateDialog.value = false;
+			newSpace.space_name = '';
+			newSpace.route = '';
+			routeManuallyEdited.value = false;
+			formError.value = '';
+			toast.success(__('Personal Space created successfully.'));
+			await spaces.reload();
+			if (res?.name) {
+				router.push({ name: 'SpaceDetails', params: { spaceId: res.name } });
+			}
+		} catch (err) {
+			formError.value =
+				err?.messages?.[0] || err?.message || __('Failed to create personal space');
+		} finally {
+			isCreating.value = false;
+		}
+		return;
+	}
+
 	if (newSpace.git_synced && !newSpace.repo_full_name.trim()) {
 		formError.value = __('Please pick a GitHub repository');
 		return;
@@ -713,9 +890,7 @@ const handleCreateSpace = () => {
 	const payload = {
 		space_name: newSpace.space_name,
 		route: newSpace.route,
-		// New spaces are published by default, so start them as public read.
-		// Guest covers everyone (anonymous + logged-in); admins can refine this
-		// in Space Settings → Permissions.
+		is_personal: 0,
 		roles: [{ role: 'Guest', permission_level: 'Read' }],
 	};
 
@@ -733,4 +908,33 @@ const handleCreateSpace = () => {
 
 	return spaces.insert.submit(payload);
 };
+
+function confirmDeleteSpace(row) {
+	spaceToDelete.value = row;
+	showDeleteConfirm.value = true;
+}
+
+async function handleDeleteSpace() {
+	if (!spaceToDelete.value) return;
+	isDeleting.value = true;
+	try {
+		await createResource({
+			url: 'frappe.client.delete',
+			params: {
+				doctype: 'Wiki Space',
+				name: spaceToDelete.value.name,
+			},
+		}).submit();
+		toast.success(__('Personal Space deleted successfully.'));
+		showDeleteConfirm.value = false;
+		spaceToDelete.value = null;
+		await spaces.reload();
+	} catch (err) {
+		toast.error(
+			err?.messages?.[0] || err?.message || __('Error deleting personal space.'),
+		);
+	} finally {
+		isDeleting.value = false;
+	}
+}
 </script>

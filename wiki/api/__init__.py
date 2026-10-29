@@ -53,11 +53,15 @@ def get_space_capabilities(space: str, page: str = None) -> dict:
 	elif space_route and has_published:
 		reader_url = f"/{space_route.strip('/')}/"
 
+	is_personal = bool(frappe.db.get_value("Wiki Space", space, "is_personal"))
+
 	return {
 		"can_read": can_read,
 		"can_write": can_write,
 		"can_contribute": can_contribute,
 		"is_read_only": is_read_only,
+		"is_personal": is_personal,
+		"enable_cr_workflow": not is_personal,
 		"reader_url": reader_url,
 		"space_route": space_route,
 		"has_documents": doc_counts["has_documents"],
@@ -65,6 +69,72 @@ def get_space_capabilities(space: str, page: str = None) -> dict:
 		"total_documents": doc_counts["total_documents"],
 		"published_documents": doc_counts["published_documents"],
 	}
+
+
+@frappe.whitelist(allow_guest=False)
+def create_personal_space(space_name: str, route: str | None = None) -> dict:
+	"""Create a personal Wiki Space owned by the current user."""
+	user = frappe.session.user
+	if not user or user == "Guest":
+		frappe.throw(frappe._("Login is required to create a personal space."), frappe.PermissionError)
+
+	space_name = (space_name or "").strip()
+	if not space_name:
+		frappe.throw(frappe._("Space Name is required."))
+
+	if not route:
+		from wiki.frappe_wiki.doctype.wiki_change_request.wiki_change_request import slugify
+		route = slugify(space_name)
+	else:
+		route = route.strip().lstrip("/")
+
+	if not route:
+		frappe.throw(frappe._("Route is required."))
+
+	suffix = 1
+	base_route = route
+	while frappe.db.exists("Wiki Space", {"route": route}):
+		route = f"{base_route}-{suffix}"
+		suffix += 1
+
+	doc = frappe.get_doc(
+		{
+			"doctype": "Wiki Space",
+			"space_name": space_name,
+			"route": route,
+			"is_personal": 1,
+			"is_published": 1,
+			"owner": user,
+		}
+	)
+	doc.insert(ignore_permissions=True)
+	return {
+		"name": doc.name,
+		"space_name": doc.space_name,
+		"route": doc.route,
+		"is_personal": 1,
+	}
+
+
+@frappe.whitelist(allow_guest=False)
+def direct_merge_change_request(name: str):
+	"""Directly approve and merge a change request in a personal space (no PR workflow)."""
+	cr = frappe.get_doc("Wiki Change Request", name)
+	from wiki.permissions import can_write_space
+	if not can_write_space(cr.wiki_space):
+		frappe.throw(frappe._("You do not have permission to edit this space."), frappe.PermissionError)
+
+	if cr.status in ("Draft", "Changes Requested"):
+		cr.status = "In Review"
+		cr.save(ignore_permissions=True)
+	if cr.status == "In Review":
+		cr.status = "Approved"
+		cr.reviewed_by = frappe.session.user
+		cr.reviewed_at = frappe.utils.now_datetime()
+		cr.save(ignore_permissions=True)
+
+	from wiki.frappe_wiki.doctype.wiki_change_request.wiki_change_request import merge_change_request
+	return merge_change_request(name)
 
 
 @frappe.whitelist()

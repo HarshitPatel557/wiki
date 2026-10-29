@@ -34,7 +34,7 @@
 									@blur="saveTitleIfChanged"
 									@keydown.enter="$event.target.blur()"
 								/>
-								<div class="flex shrink-0 items-center gap-2 pt-2">
+								<div v-if="!isPersonalSpace" class="flex shrink-0 items-center gap-2 pt-2">
 									<Badge variant="subtle" theme="blue" size="sm">
 										{{ __('Draft') }}
 									</Badge>
@@ -154,6 +154,7 @@ import {
 	FormControl,
 	LoadingIndicator,
 	Skeleton,
+	createResource,
 	getCachedDocumentResource,
 	toast,
 	usePageMeta,
@@ -183,6 +184,7 @@ const isSavingRoute = ref(false);
 
 const crStore = useChangeRequestStore();
 const draftStore = useDraftWorkspaceStore();
+const isPersonalSpace = inject('isPersonalSpace', ref(false));
 
 const crPage = ref(null);
 // Becomes true only once we've confirmed the page genuinely doesn't exist,
@@ -471,10 +473,29 @@ async function saveContent(content) {
 			content,
 			editableTitle.value,
 		);
+		if (isPersonalSpace.value) {
+			const crName = crStore.currentChangeRequest?.name;
+			if (crName) {
+				try {
+					await createResource({
+						url: 'wiki.api.direct_merge_change_request',
+						params: { name: crName },
+					}).submit();
+					crStore.currentChangeRequest = null;
+					crStore.clearChanges();
+					await draftStore.discardPersistedDraftsForCr(crName);
+					draftStore.reset({ keepTree: true });
+					if (props.spaceId) {
+						await draftStore.hydrate(props.spaceId);
+					}
+					toast.success(__('Page saved successfully'));
+				} catch (mergeErr) {
+					console.error('Direct merge failed:', mergeErr);
+				}
+			}
+		}
 	} catch (error) {
 		console.error('Error saving draft:', error);
-		// Inline failure UX comes in task #7; keep a toast for now so the
-		// user isn't left wondering whether their save worked.
 		toast.error(
 			error.messages?.[0] || error.message || __('Error saving draft'),
 		);

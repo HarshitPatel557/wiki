@@ -56,6 +56,18 @@
                 </Button>
             </template>
         </SpaceChromeBar>
+        <SpaceChromeBar
+            v-else-if="isPersonalSpace"
+            :space-name="space.doc?.space_name || spaceId"
+            :space-route="space.doc?.route"
+            @open-settings="openSettings"
+        >
+            <template #badge>
+                <Badge variant="subtle" theme="blue" size="sm">
+                    {{ __('Personal Space') }}
+                </Badge>
+            </template>
+        </SpaceChromeBar>
         <ContributionBanner
             v-else
             :mergeDisabled="isTreeReordering"
@@ -406,6 +418,12 @@ const canWriteSpace = computed(() => {
 	const data = capabilitiesResource.data;
 	return Boolean(data?.can_write || data?.can_contribute || data?.message?.can_write || data?.message?.can_contribute);
 });
+
+const isPersonalSpace = computed(() => {
+	const data = capabilitiesResource.data;
+	return Boolean(data?.is_personal || data?.message?.is_personal || space.doc?.is_personal);
+});
+provide('isPersonalSpace', isPersonalSpace);
 
 watch(
 	() => [props.spaceId, route.params.pageId],
