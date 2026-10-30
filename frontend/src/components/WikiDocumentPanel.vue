@@ -488,14 +488,6 @@ const githubEditUrl = computed(() => {
 });
 
 const menuOptions = computed(() => {
-	// Read-only spaces can't change publish state — only offer the desk link.
-	const options = props.readonly
-		? []
-		: [
-				{
-					label: displayPublished.value ? __('Unpublish') : __('Publish'),
-					icon: 'upload-cloud',
-					onClick: togglePublish,
 	const options = [
 		{
 			label: __('Copy page link'),
@@ -516,14 +508,6 @@ const menuOptions = computed(() => {
 				onClick: () => {
 					showPageSettingsDialog.value = true;
 				},
-				{
-					label: __('Page settings'),
-					icon: 'settings',
-					onClick: () => {
-						showPageSettingsDialog.value = true;
-					},
-				},
-			];
 			},
 		);
 	}

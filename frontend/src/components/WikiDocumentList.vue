@@ -72,6 +72,15 @@
 			</template>
 			<template #default>
 				<div class="space-y-4">
+					<div v-if="!createIsGroup && templateOptions.length > 1">
+						<FormControl
+							:label="__('Template')"
+							type="select"
+							:options="templateOptions"
+							:model-value="selectedTemplateName"
+							@update:model-value="onTemplateSelected"
+						/>
+					</div>
 					<FormControl v-model="createTitle" :label="__('Title')" type="text"
 						:placeholder="createPlaceholder" autofocus />
 					<div>
@@ -337,6 +346,9 @@ const {
 
 const {
 	showCreateDialog,
+	templateOptions,
+	selectedTemplateName,
+	onTemplateSelected,
 	createTitle,
 	createIsGroup,
 	createIsTab,

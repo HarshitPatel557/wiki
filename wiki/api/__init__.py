@@ -347,3 +347,66 @@ def mark_wiki_notification_as_read(docname: str = None) -> dict:
 	frappe.db.commit()
 	return {"success": True}
 
+
+@frappe.whitelist()
+def get_wiki_templates() -> list[dict]:
+	"""Return available document templates from the Templates Wiki Space.
+
+	A Wiki Space named 'Templates' (or route 'templates') contains documents
+	that serve as dynamic templates for creating new pages across all spaces.
+	"""
+	space_info = frappe.db.get_value(
+		"Wiki Space",
+		{"route": ["in", ["templates", "template"]]},
+		["name", "root_group", "route"],
+		as_dict=True,
+	)
+	if not space_info:
+		space_info = frappe.db.get_value(
+			"Wiki Space",
+			{"space_name": ["in", ["Templates", "Template"]]},
+			["name", "root_group", "route"],
+			as_dict=True,
+		)
+
+	if not space_info:
+		return []
+
+	template_space = space_info.name
+	root_group = space_info.root_group
+
+	# Try matching wiki_space first
+	docs = frappe.get_all(
+		"Wiki Document",
+		filters={
+			"wiki_space": template_space,
+			"is_group": 0,
+			"is_external_link": 0,
+			"is_published": 1,
+		},
+		fields=["name", "title", "content", "route"],
+		order_by="title asc",
+	)
+	if not docs and root_group:
+		docs = frappe.get_all(
+			"Wiki Document",
+			filters={
+				"parent_wiki_document": root_group,
+				"is_group": 0,
+				"is_external_link": 0,
+				"is_published": 1,
+			},
+			fields=["name", "title", "content", "route"],
+			order_by="title asc",
+		)
+
+	return [
+		{
+			"name": d.name,
+			"title": d.title,
+			"content": d.content or "",
+			"route": d.route,
+		}
+		for d in docs
+	]
+

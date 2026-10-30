@@ -2,12 +2,13 @@ import { useDraftWorkspaceStore } from '@/stores/draftWorkspace';
 import { slugify } from '@/stores/draftWorkspace/utils';
 import { useDebounceFn } from '@vueuse/core';
 import { createResource, toast } from 'frappe-ui';
-import { ref, unref, watch } from 'vue';
+import { computed, ref, unref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { DEFAULT_TAB_ICON } from '../lib/tabIcons.js';
 
 const CHECK_ROUTE_AVAILABLE =
 	'wiki.frappe_wiki.doctype.wiki_change_request.wiki_change_request.check_route_available';
+const GET_WIKI_TEMPLATES = 'wiki.api.get_wiki_templates';
 
 export function useTreeDialogs(
 	spaceId,
@@ -17,6 +18,34 @@ export function useTreeDialogs(
 ) {
 	const draftStore = useDraftWorkspaceStore();
 	const router = useRouter();
+
+	const templatesResource = createResource({
+		url: GET_WIKI_TEMPLATES,
+		auto: true,
+	});
+
+	const availableTemplates = computed(() => {
+		const raw = templatesResource.data || [];
+		return Array.isArray(raw) ? raw : (raw.message || []);
+	});
+
+	const templateOptions = computed(() => {
+		const options = [
+			{
+				label: __('Blank document'),
+				value: '',
+			},
+		];
+		for (const t of availableTemplates.value) {
+			options.push({
+				label: t.title || t.name,
+				value: t.name,
+			});
+		}
+		return options;
+	});
+
+	const selectedTemplateName = ref('');
 
 	const showCreateDialog = ref(false);
 	const createTitle = ref('');
@@ -134,6 +163,11 @@ export function useTreeDialogs(
 		createRoutePrefix.value = routePrefixFor(parentKey);
 		createRoute.value = '';
 		createRouteError.value = '';
+		selectedTemplateName.value = '';
+		// Re-fetch templates to ensure fresh options
+		if (!createIsGroup.value) {
+			templatesResource.fetch().catch(() => {});
+		}
 		// Retire any check still in flight from the previous dialog.
 		latestRouteCheck++;
 		routeManuallyEdited.value = false;
@@ -211,6 +245,17 @@ export function useTreeDialogs(
 		showDeleteDialog.value = true;
 	}
 
+	function onTemplateSelected(templateName) {
+		selectedTemplateName.value = templateName;
+		if (!templateName) return;
+		const found = availableTemplates.value.find((t) => t.name === templateName);
+		if (found && !createTitle.value.trim()) {
+			createTitle.value = found.title;
+			createRoute.value = derivedRoute();
+			checkRouteAvailability();
+		}
+	}
+
 	// Local-first create: store inserts a temp node into the tree immediately,
 	// the dialog closes right away, and the backend call runs in the
 	// background. Failure is surfaced through the store's mutation queue.
@@ -231,6 +276,14 @@ export function useTreeDialogs(
 		const tabIcon = createTabIcon.value || null;
 		const route = createRoute.value.trim() || derivedRoute();
 
+		let initialContent = '';
+		if (!isGroup && selectedTemplateName.value) {
+			const found = availableTemplates.value.find((t) => t.name === selectedTemplateName.value);
+			if (found && found.content) {
+				initialContent = found.content;
+			}
+		}
+
 		if (parentKey) expandedNodes.value[parentKey] = true;
 		close();
 
@@ -243,6 +296,7 @@ export function useTreeDialogs(
 				isTab,
 				tabIcon,
 				route,
+				content: initialContent,
 			});
 			// Open the new page for editing immediately. The DraftContributionPanel
 			// reads its content from pagesByKey (seeded by createNode), and the
@@ -389,6 +443,9 @@ export function useTreeDialogs(
 
 	return {
 		showCreateDialog,
+		templateOptions,
+		selectedTemplateName,
+		onTemplateSelected,
 		createTitle,
 		createIsGroup,
 		createIsTab,
