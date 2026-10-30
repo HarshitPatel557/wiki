@@ -6,6 +6,16 @@
 
 				<div class="flex shrink-0 items-center gap-2">
 					<Button
+						variant="ghost"
+						:title="__('Share Draft')"
+						@click="shareCurrentDraft"
+					>
+						<template #prefix>
+							<span class="lucide-share-2 size-4" aria-hidden="true" />
+						</template>
+						{{ __('Share') }}
+					</Button>
+					<Button
 						variant="solid"
 						:loading="isSaving"
 						@click="saveFromHeader"
@@ -160,8 +170,9 @@ import {
 	usePageMeta,
 } from 'frappe-ui';
 import { computed, inject, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import WikiEditor from './WikiEditor.vue';
+import { getDraftCanonicalUrl, handleShare } from '../lib/share';
 
 const props = defineProps({
 	docKey: {
@@ -176,6 +187,7 @@ const props = defineProps({
 
 const emit = defineEmits(['refresh']);
 const router = useRouter();
+const route = useRoute();
 const editorRef = ref(null);
 const editableTitle = ref('');
 const editableRoute = ref('');
@@ -418,12 +430,27 @@ const editorKey = computed(() => {
 const menuOptions = computed(() => {
 	return [
 		{
+			label: __('Share link'),
+			icon: 'share-2',
+			onClick: shareCurrentDraft,
+		},
+		{
 			label: __('Delete Draft'),
 			icon: 'trash-2',
 			onClick: deleteDraft,
 		},
 	];
 });
+
+function shareCurrentDraft() {
+	if (!props.spaceId || !props.docKey) return;
+	const url = getDraftCanonicalUrl(props.spaceId, props.docKey, {
+		query: route?.query,
+		hash: window.location.hash || route?.hash,
+	});
+	const title = editableTitle.value || crPage.value?.title || 'Draft Page';
+	handleShare({ title, url });
+}
 
 async function saveTitleIfChanged() {
 	const newTitle = editableTitle.value.trim();

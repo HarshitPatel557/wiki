@@ -15,6 +15,16 @@
 				{{ __('View Page') }}
 			</Button>
 			<Button
+				variant="ghost"
+				:title="__('Share Page')"
+				@click="shareCurrentPage"
+			>
+				<template #prefix>
+					<span class="lucide-share-2 size-4" aria-hidden="true" />
+				</template>
+				{{ __('Share') }}
+			</Button>
+			<Button
 				v-if="!readonly"
 				variant="solid"
 				:loading="isSaving"
@@ -163,8 +173,10 @@ import {
 	usePageMeta,
 } from 'frappe-ui';
 import { computed, inject, ref, shallowRef, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import PageSettings from './PageSettings.vue';
 import WikiEditor from './WikiEditor.vue';
+import { getPageCanonicalUrl, handleShare } from '../lib/share';
 
 const isMac = computed(() => /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent));
 
@@ -189,6 +201,7 @@ const props = defineProps({
 
 const emit = defineEmits(['refresh']);
 
+const route = useRoute();
 const editorRef = ref(null);
 const editableTitle = ref('');
 const editableRoute = ref('');
@@ -483,6 +496,25 @@ const menuOptions = computed(() => {
 					label: displayPublished.value ? __('Unpublish') : __('Publish'),
 					icon: 'upload-cloud',
 					onClick: togglePublish,
+	const options = [
+		{
+			label: __('Copy page link'),
+			icon: 'share-2',
+			onClick: shareCurrentPage,
+		},
+	];
+	if (!props.readonly) {
+		options.push(
+			{
+				label: displayPublished.value ? __('Unpublish') : __('Publish'),
+				icon: 'upload-cloud',
+				onClick: togglePublish,
+			},
+			{
+				label: __('Page settings'),
+				icon: 'settings',
+				onClick: () => {
+					showPageSettingsDialog.value = true;
 				},
 				{
 					label: __('Page settings'),
@@ -492,6 +524,9 @@ const menuOptions = computed(() => {
 					},
 				},
 			];
+			},
+		);
+	}
 	if (githubEditUrl.value) {
 		options.push({
 			label: __('Edit on GitHub'),
@@ -512,6 +547,18 @@ const menuOptions = computed(() => {
 	}
 	return options;
 });
+
+function shareCurrentPage() {
+	const space = props.spaceId || wikiDoc.value.doc?.wiki_space;
+	const page = props.pageId;
+	if (!space || !page) return;
+	const url = getPageCanonicalUrl(space, page, {
+		query: route?.query,
+		hash: window.location.hash || route?.hash,
+	});
+	const title = editableTitle.value || wikiDoc.value.doc?.title || 'Wiki Document';
+	handleShare({ title, url });
+}
 
 async function saveTitleIfChanged() {
 	if (props.readonly) return;

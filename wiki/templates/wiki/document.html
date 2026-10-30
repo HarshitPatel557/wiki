@@ -22,6 +22,12 @@
             <div class="flex items-center justify-between gap-4">
                 <h1 id="wiki-page-title" class="text-4xl-semibold text-[var(--ink-gray-9)]">{{ doc.title }}</h1>
                 <div class="flex items-center gap-2">
+                    <button @click="copyPageLink()"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm-medium text-[var(--ink-gray-7)] bg-[var(--surface-base)] border border-[var(--outline-gray-2)] rounded-lg hover:bg-[var(--surface-gray-1)] transition-colors duration-200 cursor-pointer"
+                            title="Copy link">
+                        {{ render_icon("share-2", "w-4 h-4") }}
+                        <span>Copy Link</span>
+                    </button>
                     <button @click="downloadPage()"
                             :disabled="downloadInProgress"
                             :aria-busy="downloadInProgress"
@@ -50,6 +56,7 @@
             <!-- Mobile: Edit above title -->
             <div class="flex justify-start mb-4 sm:hidden">
                 {{ page_actions_dropdown(edit_href=doc.get_edit_link(), show_edit=can_edit, edit_external=wiki_space.git_synced) }}
+                    {{ page_action_item(text="Copy link", description="Copy document link to clipboard", icon="share-2", click="copyPageLink(); open = false") }}
                     {{ download_action_item() }}
                     {% if can_edit %}
                     {{ page_action_item(text="Copy page", description="Copy page as Markdown for LLMs", icon="clipboard", click="copyMarkdown(); open = false") }}
@@ -64,6 +71,7 @@
                 <!-- Desktop: Edit beside title -->
                 <div class="hidden sm:block">
                     {{ page_actions_dropdown(edit_href=doc.get_edit_link(), show_edit=can_edit, edit_external=wiki_space.git_synced) }}
+                        {{ page_action_item(text="Copy link", description="Copy document link to clipboard", icon="share-2", click="copyPageLink(); open = false") }}
                         {{ download_action_item() }}
                         {% if can_edit %}
                         {{ page_action_item(text="Copy page", description="Copy page as Markdown for LLMs", icon="clipboard", click="copyMarkdown(); open = false") }}
@@ -153,6 +161,54 @@
 
             get markdown() {
                 return this.$store.pageContent?.markdown || '';
+            },
+
+            async copyPageLink() {
+                const url = window.location.href;
+                if (navigator.share && typeof navigator.share === 'function') {
+                    let canShare = true;
+                    if (typeof navigator.canShare === 'function') {
+                        try {
+                            canShare = navigator.canShare({ url });
+                        } catch {
+                            canShare = true;
+                        }
+                    }
+                    if (canShare) {
+                        try {
+                            await navigator.share({ title: document.title, url });
+                            return;
+                        } catch (err) {
+                            if (err && (err.name === 'AbortError' || err.code === 20)) return;
+                        }
+                    }
+                }
+                const notify = (msg, ind) => {
+                    if (window.frappe?.show_alert) {
+                        window.frappe.show_alert({ message: msg, indicator: ind });
+                    }
+                };
+                try {
+                    if (navigator.clipboard?.writeText && window.isSecureContext) {
+                        await navigator.clipboard.writeText(url);
+                        notify(__('Link copied to clipboard'), 'green');
+                        return;
+                    }
+                } catch (e) {}
+
+                try {
+                    const el = document.createElement('textarea');
+                    el.value = url;
+                    el.style.position = 'fixed';
+                    el.style.opacity = '0';
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    notify(__('Link copied to clipboard'), 'green');
+                } catch (err) {
+                    notify(__('Failed to copy link to clipboard'), 'red');
+                }
             },
 
             copyMarkdown() {

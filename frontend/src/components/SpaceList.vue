@@ -171,6 +171,13 @@
                     {{ __('View') }}
                   </Button>
                   <Button
+                    variant="ghost"
+                    size="sm"
+                    icon="share-2"
+                    :title="__('Share Space')"
+                    @click.stop.prevent="shareSpace(row)"
+                  />
+                  <Button
                     v-if="isPersonalRow(row) && (row.owner === currentUser || isManager)"
                     variant="ghost"
                     theme="red"
@@ -400,6 +407,7 @@ import Autocomplete from '@/components/Autocomplete.vue';
 import MobileAppMenu from '@/components/MobileAppMenu.vue';
 import { useMobile } from '@/composables/useMobile';
 import { useUserStore } from '@/stores/user';
+import { getSpaceCanonicalUrl, handleShare } from '@/lib/share';
 import {
 	Badge,
 	Button,
@@ -928,6 +936,14 @@ const handleCreateSpace = async () => {
 
 	return spaces.insert.submit(payload);
 };
+
+function shareSpace(row) {
+	if (!row?.name) return;
+	handleShare({
+		title: row.space_name || row.name,
+		url: getSpaceCanonicalUrl(row.name),
+	});
+}
 
 function confirmDeleteSpace(row) {
 	spaceToDelete.value = row;

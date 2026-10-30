@@ -29,6 +29,12 @@
 			/>
 			<Button
 				variant="ghost"
+				icon="share-2"
+				:title="__('Share Space')"
+				@click="onShareSpace"
+			/>
+			<Button
+				variant="ghost"
 				icon="settings"
 				:title="__('Settings')"
 				@click="emit('open-settings')"
@@ -85,8 +91,9 @@
 import { Button, Skeleton } from 'frappe-ui';
 
 import WikiDocumentList from './WikiDocumentList.vue';
+import { getSpaceCanonicalUrl, handleShare } from '../lib/share';
 
-defineProps({
+const props = defineProps({
 	spaceId: { type: String, required: true },
 	spaceName: { type: String, default: '' },
 	spaceRoute: { type: String, default: '' },
@@ -106,4 +113,12 @@ defineProps({
 });
 
 const emit = defineEmits(['refresh', 'reorder-state-change', 'open-settings']);
+
+function onShareSpace() {
+	if (!props.spaceId) return;
+	handleShare({
+		title: props.spaceName || props.spaceId,
+		url: getSpaceCanonicalUrl(props.spaceId),
+	});
+}
 </script>
